@@ -1,53 +1,12 @@
-import { useEffect, useState } from "react";
 import "./App.css";
 import ParamsView from "./components/ParamsView";
-import { apiGetParams, apiSetParams } from "./api";
 
 import { ConfigProvider, theme, Layout } from "antd";
 import PriceTracker from "./components/PriceTracker";
 import OrderList from "./components/OrderList";
 const { Content, Sider } = Layout;
 
-const initialParams = {
-  symbol: "",
-  volume: "",
-  expectedBuy: 0,
-  stopLoss: 0,
-  takeProfit: 0,
-  active: false,
-};
-
-const styles = {
-  sider: {
-    background: "none",
-    padding: "0 20px 20px",
-  },
-};
 function App() {
-  const [tradeParams, setTradeParams] = useState(initialParams);
-
-  useEffect(() => {
-    const getParams = async () => {
-      try {
-        const { data } = await apiGetParams();
-        setTradeParams(data);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    getParams();
-  }, []);
-
-  const onChangeParams = async (params) => {
-    try {
-      const { data } = await apiSetParams(params);
-      setTradeParams({ ...params, active: data.status });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   return (
     <ConfigProvider
       theme={{
@@ -57,10 +16,13 @@ function App() {
     >
       <Layout className="root-container">
         <Content>
-          <ParamsView params={tradeParams} onChange={onChangeParams} />
+          <ParamsView />
           <OrderList />
         </Content>
-        <Sider width={380} style={styles.sider}>
+        <Sider
+          width={380}
+          style={{ background: "none", padding: "0 20px 20px" }}
+        >
           <PriceTracker />
         </Sider>
       </Layout>

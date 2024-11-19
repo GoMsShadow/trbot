@@ -262,6 +262,92 @@ app.post("/api/cancelOrder", async (req, res) => {
   }
 });
 
+// GET all symbols
+app.get("/api/symbol", async (req, res) => {
+  try {
+    const { rows: symbols } = await sql`SELECT * FROM symbols`;
+    res.json({ success: true, symbols });
+  } catch (error) {
+    console.error("Error fetching symbols:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post("/api/symbol", async (req, res) => {
+  const { name } = req.body;
+  try {
+    const { rows: existingSymbols } =
+      await sql`SELECT * FROM symbols WHERE name = ${name}`;
+    if (existingSymbols.length > 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Symbol name must be unique" });
+    }
+
+    await sql`INSERT INTO symbols (name) VALUES (${name})`;
+    res
+      .status(201)
+      .json({ success: true, message: "Symbol created successfully" });
+  } catch (error) {
+    console.error("Error creating symbol:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.put("/api/symbol/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+
+  try {
+    const { rows: existingSymbols } =
+      await sql`SELECT * FROM symbols WHERE name = ${name} AND id != ${id}`;
+    if (existingSymbols.length > 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Symbol name must be unique" });
+    }
+
+    const { rowCount } =
+      await sql`UPDATE symbols SET name = ${name} WHERE id = ${id}`;
+    if (rowCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Symbol not found" });
+    }
+
+    res.json({ success: true, message: "Symbol updated successfully" });
+  } catch (error) {
+    console.error("Error updating symbol:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.delete("/api/symbol/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rowCount } = await sql`DELETE FROM symbols WHERE id = ${id}`;
+    if (rowCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Symbol not found" });
+    }
+
+    res.json({ success: true, message: "Symbol deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting symbol:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.get("/api/symbol-table", async (req, res) => {
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS symbols (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL)`;
+    console.log("Table 'symbols' created successfully.");
+  } catch (error) {
+    console.error("Error creating table: ", error);
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

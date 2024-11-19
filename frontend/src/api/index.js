@@ -23,3 +23,19 @@ export const apiCancelAllOpenOrders = async () => {
 export const apiLoadAllOrders = async () => {
   return await axios.get("/api/loadAllOrders");
 };
+
+export const apiGetSymbols = async () => {
+  return await axios.get("/api/symbol");
+};
+
+export const apiCreateSymbol = async (name) => {
+  return await axios.post("/api/symbol", { name });
+};
+
+export const apiUpdateSymbol = async (id, name) => {
+  return await axios.put(`/api/symbol/${id}`, { name });
+};
+
+export const apiDeleteSymbol = async (id) => {
+  return await axios.delete(`/api/symbol/${id}`);
+};

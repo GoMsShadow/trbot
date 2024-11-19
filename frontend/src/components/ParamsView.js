@@ -1,5 +1,26 @@
-import { Input, InputNumber, Layout, Tabs, Form, Button, Space } from "antd";
+import {
+  Input,
+  InputNumber,
+  Layout,
+  Tabs,
+  Form,
+  Button,
+  Space,
+  Select,
+  Flex,
+  Modal,
+  List,
+  Spin,
+} from "antd";
 import React, { useEffect, useState } from "react";
+import {
+  apiCreateSymbol,
+  apiDeleteSymbol,
+  apiGetParams,
+  apiGetSymbols,
+  apiSetParams,
+  apiUpdateSymbol,
+} from "../api";
 
 const initialParams = {
   symbol: "",
@@ -27,33 +48,159 @@ const styles = {
   },
 };
 
-const ParamsView = ({ params = initialParams, onChange }) => {
-  const [tradeParams, setTradeParams] = useState(params);
+const emptySymbol = { id: -1, name: "" };
+const ParamsView = () => {
+  const [tradeParams, setTradeParams] = useState(initialParams);
+  const [symbols, setSymbols] = useState([]);
+  const [modalOpened, setModalOpened] = useState(false);
+  const [symbolToEdit, setSymbolToEdit] = useState(emptySymbol);
+  const [errorMessage, setErrorMessage] = useState();
+  const [loading, setLoading] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState();
 
   useEffect(() => {
-    setTradeParams(params);
-  }, [params]);
+    getParams();
+    getSymbols();
+  }, []);
+
+  const getParams = async () => {
+    try {
+      const { data } = await apiGetParams();
+      setTradeParams(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const getSymbols = async () => {
+    try {
+      setLoading(true);
+      const { data } = await apiGetSymbols();
+      setSymbols(data.symbols);
+      setLoading(false);
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+    }
+  };
 
   const { symbol, volume, expectedBuy, stopLoss, takeProfit, active } =
     tradeParams;
 
   const handleStartStop = async () => {
-    const { active, ...restParams } = tradeParams;
-    if (
-      !(
-        (!expectedBuy && !stopLoss && !takeProfit) ||
-        (expectedBuy && stopLoss && takeProfit)
-      )
-    ) {
-      alert("Wrong parameters");
-      return;
-    }
+    try {
+      const { active, ...restParams } = tradeParams;
+      if (
+        !(
+          (!expectedBuy && !stopLoss && !takeProfit) ||
+          (expectedBuy && stopLoss && takeProfit)
+        )
+      ) {
+        alert("Wrong parameters");
+        return;
+      }
 
-    onChange(restParams);
+      const { data } = await apiSetParams(restParams);
+      setTradeParams({ ...tradeParams, active: data.status });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
+  const handleAddEditSymbol = async () => {
+    try {
+      if (!symbolToEdit.name.trim().length) {
+        setErrorMessage("It should not be empty!");
+        return;
+      }
+      if (symbols.find(({ name }) => symbolToEdit.name === name)) {
+        setErrorMessage("The symbol already exists!");
+        return;
+      }
+
+      setLoading(true);
+      if (symbolToEdit.id !== -1) {
+        await apiUpdateSymbol(symbolToEdit.id, symbolToEdit.name);
+      } else {
+        await apiCreateSymbol(symbolToEdit.name);
+      }
+
+      setSymbolToEdit(emptySymbol);
+      await getSymbols();
+    } catch (error) {
+      console.log(error);
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSymbol = async (id) => {
+    setLoading(true);
+    await apiDeleteSymbol(id);
+    await getSymbols();
+  };
   return (
     <Layout className="mt-5">
+      <Modal
+        title="Symbol Manager"
+        open={modalOpened}
+        onCancel={() => {
+          setModalOpened(false);
+          setErrorMessage();
+          setSymbolToEdit(emptySymbol);
+        }}
+        footer={null}
+      >
+        <Spin spinning={loading}>
+          <Flex style={{ marginTop: 12 }}>
+            <Input
+              placeholder="Enter symbol"
+              value={symbolToEdit.name}
+              onChange={(e) => {
+                setSymbolToEdit({ ...symbolToEdit, name: e.target.value });
+                setErrorMessage();
+              }}
+              style={{ marginRight: 8 }}
+            />
+            <Button type="primary" onClick={() => handleAddEditSymbol()}>
+              {symbolToEdit.id !== -1 ? "Update" : "Add"}
+            </Button>
+          </Flex>
+          {errorMessage && (
+            <span style={{ color: "#dc4446", fontSize: 12 }}>
+              {errorMessage}
+            </span>
+          )}
+          <List
+            style={{ marginTop: 12 }}
+            bordered
+            dataSource={symbols}
+            renderItem={(symbol) => (
+              <List.Item
+                style={{ padding: "4px 12px" }}
+                actions={[
+                  <Button
+                    type="link"
+                    onClick={() => setSymbolToEdit(symbol)}
+                    style={{ padding: 0 }}
+                  >
+                    Edit
+                  </Button>,
+                  <Button
+                    type="link"
+                    danger
+                    onClick={() => handleDeleteSymbol(symbol.id)}
+                    style={{ padding: 0 }}
+                  >
+                    Delete
+                  </Button>,
+                ]}
+              >
+                <span>{symbol.name}</span>
+              </List.Item>
+            )}
+          />
+        </Spin>
+      </Modal>
       <Tabs
         defaultActiveKey="trade"
         items={[
@@ -62,14 +209,31 @@ const ParamsView = ({ params = initialParams, onChange }) => {
             label: "General",
             children: (
               <Form style={{ marginTop: -8 }}>
-                <Input
+                <Flex>
+                  <Select
+                    style={{ flex: 1, marginRight: 8 }}
+                    options={symbols.map(({ id, name }) => ({
+                      value: id,
+                      label: name,
+                    }))}
+                    placeholder="Select a symbol"
+                    onChange={(_, value) =>
+                      setTradeParams({ ...tradeParams, symbol: value.label })
+                    }
+                    value={symbol}
+                  />
+                  <Button onClick={() => setModalOpened(true)}>
+                    Add / Edit
+                  </Button>
+                </Flex>
+                {/* <Input
                   prefix={<span style={styles.inputPrefix}>Symbol:</span>}
                   value={symbol}
                   onChange={(e) =>
                     setTradeParams({ ...tradeParams, symbol: e.target.value })
                   }
                   style={styles.input}
-                />
+                /> */}
                 <Input
                   prefix={<span style={styles.inputPrefix}>Trade Volume:</span>}
                   value={volume}
@@ -120,48 +284,6 @@ const ParamsView = ({ params = initialParams, onChange }) => {
                   }
                   style={styles.inputNumber}
                 />
-                {/* <InputGroup className="mt-2">
-                  <InputGroup.Text>Expected Buy Price:</InputGroup.Text>
-                  <Form.Control
-                    type="number"
-                    value={expectedBuy}
-                    onChange={(e) =>
-                      setTradeParams({
-                        ...tradeParams,
-                        expectedBuy: e.target.value,
-                      })
-                    }
-                    placeholder="Enter Expected Buy Price"
-                  />
-                </InputGroup>
-                <InputGroup className="mt-2">
-                  <InputGroup.Text>Take Profit (%):</InputGroup.Text>
-                  <Form.Control
-                    type="number"
-                    value={takeProfit}
-                    onChange={(e) =>
-                      setTradeParams({
-                        ...tradeParams,
-                        takeProfit: e.target.value,
-                      })
-                    }
-                    placeholder="Enter Take Profit percentage"
-                  />
-                </InputGroup>
-                <InputGroup className="mt-2">
-                  <InputGroup.Text>Stop Loss (%):</InputGroup.Text>
-                  <Form.Control
-                    type="number"
-                    value={stopLoss}
-                    onChange={(e) =>
-                      setTradeParams({
-                        ...tradeParams,
-                        stopLoss: e.target.value,
-                      })
-                    }
-                    placeholder="Enter Stop Loss percentage"
-                  />
-                </InputGroup> */}
               </Form>
             ),
           },
